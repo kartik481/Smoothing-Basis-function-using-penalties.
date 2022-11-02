@@ -12,7 +12,7 @@ library(MASS)
 library(methods)
 
 Basis_mat<- function (x,k,bord){
-
+  
   dk <- diff(range(x))/(k-bord)                ## knot spacing
   knots <- seq(min(x)-dk*bord,by=dk,length=k+bord+1)
   X <- splines::splineDesign(knots,x,ord=bord+1,outer.ok=TRUE)
@@ -21,19 +21,18 @@ Basis_mat<- function (x,k,bord){
 
 
 estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
-
 ## This function estimates the optimal value of lambda by minimizing the gcv 
 ## value. The function takes argument Q, R (Founded using QR decomposition), X
 ## (Basis Matrix), y (labels), logsp (the ends of interval to search for lambda)
 ## ngrid (the of lambda values to try)
   
-                                             
   
-     
+  
+  
   S <- t(solve(R)) %*% t(D) %*% D %*% solve(R)
-                                        ## Defining the eigen decomposition
-                                        ## vector to decompose to speed up the 
-                                        ## search for lambda
+                                             ## Defining the eigen decomposition
+                                             ## vector to decompose to speed up  
+                                             ## search for optimal lambda
   
   ev <- eigen(S)                        ## getting Eigen values and vector
   A <- diag(ev$values)                  ## Extract the eigen components for A
@@ -43,14 +42,15 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
                                        ## Creating a grid to search
                                        ## for lambda values to try. Taking 
                                        ## exponential because all values are in
-                                       ## log scale to convert back we use exp
+                                       ## log scale to convert back we use exp()
+                                       ## exponential function.
   
-   
+  
   gcv <- 1e6                           ## initializing the min_gcv value  
                                        ## to very large value in order to 
                                        ## get minimum gcv to specific lambda
   
-  lambda <- 0                          ## making global variable in order
+  lambda <- 0                          ## making global variables in order
   edk <-0                              ## extract it from the loop's scope
                                        ## where edk is effective degrees of 
                                        ## freedom
@@ -59,41 +59,43 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
                                        ## same dimensions as k
   
   for (temp_lambda in vals){           ## iterating vals(i.e. lambda values)
-   
-    ## Initializing the beta with respective value of lambda stored in vals 
     
+    ## Initializing the beta with respective value of lambda stored in vals 
     beta <- solve(R)%*%U%*%solve( I + temp_lambda * A)%*%t(U)%*%t(Q)%*% y
     
     temp_edk <- sum(diag(solve( I + temp_lambda * A)))
-                                      ## temporary Effective Degrees of Freedom
+                                       ## temporary Effective Degrees of Freedom
+                                       ## for that specific lambda
     
-    fitted <- X %*% beta              ## fitted values course
+    fitted <- X %*% beta               ## fitted values course
     
     sigma_2 <- (t(y-fitted) %*% (y-fitted)) / (n-temp_edk)
-                                      ## Calculating the residual variance to 
-                                      ## find the temporary gcv in order to 
-                                      ## minimize it
+                                       ## Calculating the residual variance to 
+                                       ## find the temporary gcv in order to 
+                                       ## minimize it
     
-    temp_gcv <- sigma_2 / (n-temp_edk)       ## computing GCV values using the 
-                                             ## given formula
-           
-                                             
+    temp_gcv <- sigma_2 / (n-temp_edk) ## computing temporary GCV values using  
+                                       ## given formula
+    
+    
     if (temp_gcv < gcv){                     ## comparing the minimum value with
                                              ## previous results
       
-      gcv <- temp_gcv                 ## getting the index of minimum value
-                                      ## corresponding to gcv 
-                       
-                                      ## extracting the parameters from
-      lambda <- temp_lambda           ## the for corresponding gcv i.e.
-                                      ## lambda and effective degrees of 
-                                      ## freedom i.e. edk
-      edk <- temp_edk
-      opt_sigma_2 <<-sigma_2
+      gcv <- temp_gcv                        ## getting the minimum value of the
+                                             ## corresponding gcv 
+      
+                                             ## extracting the parameters from
+      lambda <- temp_lambda                  ## the for corresponding gcv i.e.
+                                             ## lambda  
+      
+      edk <- temp_edk                        ## Effective degrees of freedom edk 
+      opt_sigma_2 <<-sigma_2                 ## and optimal value of residual
+                                             ## variance by minimizing GCV.
     }
   }
-  return(c(lambda,gcv,edk,opt_sigma_2))   ## return the optimal parameters
-                                         
+  return(c(lambda,gcv,edk,opt_sigma_2))   ## return the optimal parameters 
+                                          ## obtained
+  
   
 }
 
@@ -112,7 +114,7 @@ pspline<- function (x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100){
   
   D <- diff(diag(k),differences=pord)      ## D is a k−2 × k matrix of zeroes
                                            ## used to estimate beta
-
+  
   lambda <- 0                              ## initialing as global var.
   
   if (length(logsp)==1){
@@ -122,11 +124,15 @@ pspline<- function (x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100){
     Q <- qr.Q(QR)                          ## Extarcting the Q matrix
     R <- qr.R(QR)                          ## Extracting the R matrix
     
-    optimal <- estimate(n,Q,R,D,X,y,k,logsp,ngrid) ## Calling the func estimate to
-    lambda <- optimal[1]                           ## to get optimal value of λ &
-    gcv <<- optimal[2]
-    edk <<- optimal[3]
-    sigma_2 <<- optimal[4]
+    optimal <- estimate(n,Q,R,D,X,y,k,logsp,ngrid) 
+                                           ## Calling the func estimate to
+    lambda <- optimal[1]                   ## to get optimal value of λ 
+                                                      
+    gcv <<- optimal[2]                     ## Extracting the optimal value of 
+    edk <<- optimal[3]                     ## GCV, edk(effective degrees of 
+                                           ## freedom)
+    sigma_2 <<- optimal[4]                 ## Residual variance                            
+    
   }
   beta <- solve(t(X) %*% X + lambda * t(D) %*% D) %*% t(X) %*% y
   fit <- X %*% beta
@@ -135,6 +141,7 @@ pspline<- function (x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100){
 
 data(mcycle)                           ## Getting the mcycle dataset from 
                                        ## mass library
+
 x_train <- mcycle$times                ## Input values that corresponds to time 
                                        ## at an instant
 
@@ -142,13 +149,12 @@ y_train <- mcycle$accel                ## Labels for the train values that
                                        ## corresponds to the acceleration at 
                                        ## that specific time
 
-x_new <- mcycle$times[101:133]
-y_new <- mcycle$accel[101:133]
+
 
 attr <- pspline(x_train,y_train,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100)
 
 a <-list(x=x_train,y=y_train,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100,lambda=attr[[1]]
-          ,beta=attr[[2]],fit=attr[[3]],sigma_2=attr[[4]],edk=attr[[5]],gcv=attr[[6]])
+         ,beta=attr[[2]],fit=attr[[3]],sigma_2=attr[[4]],edk=attr[[5]],gcv=attr[[6]])
 
 class(a) <- "pspline"
 
@@ -170,13 +176,14 @@ predict.pspline <- function(m,x,se=TRUE){
   D <- diff(diag(m$k),differences=m$pord) 
   
   V <- solve(t(Xp) %*% Xp + m$lambda * t(D) %*%  D) * sigma_2            
-  std_err <- rowSums(Xp * (Xp %*% V))^0.5
+  
+  std_err <- sqrt(rowSums(Xp * (Xp %*% V)))
   if (se){
     fit <- Xp %*% m$beta
     se <- std_err
     return(list(fit,se)) 
   }else{
-
+    
     predictions <- Xp %*% m$beta 
     return(predictions)
   }
@@ -192,10 +199,17 @@ plot.pspline <- function(m)
                                               ## the location of figures.
   
   plot(m$x,m$y,xlab="Data",ylab="Labels",col=7)
-                                              ## Plotting the 1st figure 
+  ## Plotting the 1st figure 
   lines(m$x,m$fit,col="red")
-  legend(1,95,legend = c("Smooth spline"),col=c("red"),lty=1,cex=0.6
-         ,text.font = 4)
+  
+  se <- predict(m,m$x)[[2]]
+  print(se)
+  upper<- m$fit + 1.96*se                                # upper 95% conf. band
+  lower <- m$fit - 1.96*se                               # lower 95% conf. band
+  
+  lines(m$x, upper, type="plp", pch="-",col=4)
+  lines(m$x, lower, type="plp", pch="-",col=4)
+  
   
   residuals <- m$y-m$fit
   plot(m$fit,residuals,xlab="Fitted values",ylab="Residuals",col="red")
@@ -208,7 +222,5 @@ plot.pspline <- function(m)
 
 imp <-print(a)
 
-pred <- predict(a,x_new)
-
+pred <-predict(a,x_train)
 plot(a)
-  
