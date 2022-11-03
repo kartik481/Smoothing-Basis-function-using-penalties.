@@ -5,7 +5,7 @@
 ################################ Contributor ################################## 
 ##---------------------------  Kartik (s2407270)------------------------------##
 
-##------------------------------ Problem Description -------------------------##
+##------------------------------ Description ---------------------------------##
 
 ## In this practical, R functions for smoothing x, y data have to be written. 
 ## The model is defined using the equation:- 
@@ -48,13 +48,13 @@
 ## To avoid this, the QR decomposition of our basis is done matrix such
 ## that X = QR, then after doing that we are decomposing the resultant matrix 
 
-##             (U* A* U^T= R^−T* D^T* D * R^−1) by eigen decomposition.
+##             U* A* U^T= R^−T* D^T* D * R^−1  using eigen decomposition.
 
 ## By doing this trick we easily find our parameters using only O(k) operation 
 ## for each new value of lambda:
 ## The coefficients are then calculated using:
 
-##                      R^−1 *U *(I + λ*A)^−1* U^T * Q^T * y 
+##                    β = R^−1 *U *(I + λ*A)^−1* U^T * Q^T * y 
 
 ## edk(effective degrees of freedom) =  tr{(I + λA)^−1}
 
@@ -62,17 +62,16 @@
 ## Finally, the function can be estimated by using the appropriate penalty which
 ## can be seen in final plots. 
 ## s.t. estimated values are given by y_est = Xβ + ε
+## By using these parameters we can then find errors like R^2, residual standard
+## error 
 
 
 
-#################################### CODE  #####################################
+#----------------------------------- CODE  ------------------------------------#
 
-
-##library(MASS)
-## Used to get the mcycle data from MASS library
 
 Basis_mat<- function (x,k,bord){
-## This function is used for seeting up Basis matrix for x vector,
+## This function is used for setting up Basis matrix for x vector,
 ## where the bord is the order of B-spline to use.
   
   dk <- diff(range(x))/(k-bord)        ## knot spacing
@@ -210,11 +209,12 @@ pspline<- function (x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100){
 ## x and y – the vectors of x, y data to smooth. k – the number of basis 
 ## functions to use logsp – the ends of the interval over which to search for 
 ## the smoothing parameter (log λ scale). 
-## bord – the B-spline order to use: 3 corresponds to cubic.
-## pord – the order of difference to use in the penalty. 2 is for the penalty 
+## bord – the B-spline order to use.
+## pord – the order of difference to use in the penalty.  
 ## ngrid – the number of smoothing parameter values to try. 
   
   X <- Basis_mat(x,k,bord)                 ## Setting up the basis (X matrix)
+                                           ## using Basis_mat function
   
   n <- length(x)                           ## No. of input values or datapoints
   
@@ -310,7 +310,7 @@ print.pspline <- function (m){
                                       ## deviation, r^2 and gcv
   
   invisible(list(m$gcv, m$edk, r2))   ## Silently returning the GCV, edk, r^2
-                                      ## using invisible 
+                                      ## using invisible function
                                     
 }
 
@@ -328,7 +328,9 @@ predict.pspline <- function(m,x,se=TRUE){
   
   std_err <- rowSums(Xp * (Xp %*% m$V))^0.5
                                       ## Calculating the standard error by 
-                                      ## taking the sqrt of covariance matrix.
+                                      ## taking the sqrt of predicted value
+                                      ## covariance matrix. (where V is
+                                      ## covariance for coefficients)
                                       
   
   if (se){     
@@ -350,12 +352,13 @@ predict.pspline <- function(m,x,se=TRUE){
 plot.pspline <- function(m){
 ## This function plots the three different types of plots by taking pspline
 ## class object(m) as a argument. 
+  
   layout(matrix(c(1,1,2,3),2,2,byrow=TRUE))   ## splitting the plot window in 
                                               ## areas with custom sizes using 
                                               ## layout function, where 
                                               ## matrix in function specifying 
                                               ## the location of figures.
-  
+  ## 1st plot
   plot(m$x, m$y, main=" Smooth function fitted to the Data", 
   xlab="x", ylab="y")          
                                               ## Plotting the 1st figure of 
@@ -381,17 +384,17 @@ plot.pspline <- function(m){
   lines(m$x, ll, type="l", lty=2, col="blue") ## Plotting the upper 95% lowe
                                               ## credible intervals
   
-  legend("topleft", legend=c("Fitted smooth function", "95% credible intervals")
-  , col=c("red","blue"),lty=1:2 ,cex=0.437, bty="n") 
+  legend(x="topleft",legend=c("Fitted smooth function", "95% credible intervals")
+  , col=c("red","blue"),lty=1:2 ,cex=0.437,bty='n') 
                                               ## Adding legend to the plot 
                                               ## describing the plot
   
-  
+  ## 2nd Plot
   plot(m$fitted, m$residuals, main="Residuals against fitted values", 
   xlab="Fitted values", ylab="Residuals", col="red")
                                               ## plot the model residuals 
                                               ## against fitted values
-  
+  ## 3rd plot
   qqnorm(m$residuals, pch = 1, frame= FALSE)  ## qqplot of the residuals.
   qqline(m$residuals, col="red", lwd=1)       ## Adding line to qqplot
   
@@ -399,27 +402,14 @@ plot.pspline <- function(m){
                                               ## using invisible function.
 }
 
-data(mcycle)                           ## Getting the mcycle dataset from 
-                                       ## mass library
-
-x <- mcycle$times                      ## Input values that corresponds to time 
-                                       ## at an instant
-
-y <- mcycle$accel                      ## Labels for the train values that 
-                                       ## corresponds to the acceleration at 
-                                       ## that specific time
-
-
-
-model <- pspline(x, y)
-## Storing the results returned from pspline function in a object named model.
+model <- pspline(x, y)   ## Storing the results returned from pspline function 
+                         ## in a object named model.
 
 print(model)                             ## print is a method of pspline class
                                          ## which is printing details about our
                                          ## fitted model.
 
-set.seed(0)     
-## Setting the seed so that data don't randomize every time
+set.seed(0)              ## Setting the seed so that data don't randomize 
 
 x_new <- runif(100,min(x),max(x))        ## New x values within the range of the 
                                          ## original data generated using 
