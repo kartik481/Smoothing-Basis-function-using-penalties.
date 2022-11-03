@@ -7,8 +7,11 @@
 
 ##------------------------------ Problem Description -------------------------##
 
-## In this practical, we have to write the R functions for smoothing x, y data. 
-## The model is defined using the equation:- yi =f(xi)+εi, i=1,...,n
+## In this practical, R functions for smoothing x, y data have to be written. 
+## The model is defined using the equation:- 
+
+##                          yi =f(xi)+εi, i=1,...,n
+
 ## where xi and yi are observed and where as f(xi) is a unknown smooth function
 ## for which we have to estimate the parameters. To estimate f you approximate 
 ## it using a basis expansion, f(x) = sum(βjbj(x)), j=1...,k where the bj(x) are 
@@ -34,21 +37,28 @@
 ## to treat its statistical degrees of freedom as k. Instead the effective 
 ## degrees of freedom, κ = tr{(XT X+ λDT D)−1XT X} is used.
 ## And from this result we can then caclculate the residual variance given by
+
 ##                        sig2(σˆ2) = |y − μ|^2 / (n − κ), 
+
 ## By calculating these parameters for our data, we can finally find GCV which  
 ## is called generalized cross validation criterion. [GCV= σˆ2 / (n − κ)] 
+
 ## But computing GCV directly can be very costly and can take O(k^3) operations 
 ## to find the value of lambda.
 ## To avoid this, the QR decomposition of our basis is done matrix such
 ## that X = QR, then after doing that we are decomposing the resultant matrix 
-## (U* A* U^T= R^−T* D^T* D * R^−1) by eigen decomposition.
-##                          
+
+##             (U* A* U^T= R^−T* D^T* D * R^−1) by eigen decomposition.
+
 ## By doing this trick we easily find our parameters using only O(k) operation 
 ## for each new value of lambda:
-## The coefficients are then calculated using R^−1 *U *(I + λ*A)^−1* U^T * Q^T*y 
-## edk(effective degrees of freedom) =  tr{(I + λA)^−1}
-## To find sig2 and gcv the results remains same as in previous method. 
+## The coefficients are then calculated using:
 
+##                      R^−1 *U *(I + λ*A)^−1* U^T * Q^T * y 
+
+## edk(effective degrees of freedom) =  tr{(I + λA)^−1}
+
+## To find sig2 and gcv the results remains same as in previous method.
 ## Finally, the function can be estimated by using the appropriate penalty which
 ## can be seen in final plots. 
 ## s.t. estimated values are given by y_est = Xβ + ε
