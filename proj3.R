@@ -6,6 +6,7 @@
 ##---------------------------  Kartik (s2407270)------------------------------##
 
 ##------------------------------ Problem Description -------------------------##
+
 ## In this practical, we have to write the R functions for smoothing x, y data. 
 ## The model is defined using the equation:- yi =f(xi)+εi, i=1,...,n
 ## where xi and yi are observed and where as f(xi) is a unknown smooth function
@@ -18,29 +19,39 @@
 
 ## But to avoid over fitting, we are introducing a smoothing penalty. 
 ## Then the model is penalized by using least square method:   
-##                        β = argmin |y−Xβ|**2 + λ*βT*DT*D*β (T means transpose) 
+
+##         β = argmin |y−Xβ|**2 + λ * β^T *D^T *D *β (T means transpose) 
+
 ## where lambda(λ) is the smoothing parameter which we need to estimate
 ## by using the grid search between the specified intervals by minimizing the 
 ## gcv(generalized cross validation criterion). But if only one value is given 
-## then no searching is done for it.
+## then no searching is done for it. Since the values of lambda are given in
+## log scale but can drived taking the exponential of log(lambda). 
 
 ## If we find optimal value for lambda then we can easily find our coefficients
 ## Given that our smooth function estimate can vary from something very wiggly 
 ## to a simple straight line fit as lambda(λ) increases, it does not make sense 
 ## to treat its statistical degrees of freedom as k. Instead the effective 
 ## degrees of freedom, κ = tr{(XT X+ λDT D)−1XT X} is used.
-## And from this result we can then caclculate the residual vairance given by
+## And from this result we can then caclculate the residual variance given by
 ##                        sig2(σˆ2) = |y − μ|^2 / (n − κ), 
-## By calculating these paramtersfor our data, we can finally find GCV which is 
-## called generalized cross validation criterion. But computing GCV directly can
-## be very costly and can take O(k^3) operations to find the value of lambda.
-## To avoid this, we are doing the QR decomposition of our basis matrix such
+## By calculating these parameters for our data, we can finally find GCV which  
+## is called generalized cross validation criterion. [GCV= σˆ2 / (n − κ)] 
+## But computing GCV directly can be very costly and can take O(k^3) operations 
+## to find the value of lambda.
+## To avoid this, the QR decomposition of our basis is done matrix such
 ## that X = QR, then after doing that we are decomposing the resultant matrix 
-## by eigen decomposition using the given formula. By doing this trick we easily
-## find our parameters using only O(k) operation for each new value of lambda.
+## (U* A* U^T= R^−T* D^T* D * R^−1) by eigen decomposition.
+##                          
+## By doing this trick we easily find our parameters using only O(k) operation 
+## for each new value of lambda:
+## The coefficients are then calculated using R^−1 *U *(I + λ*A)^−1* U^T * Q^T*y 
+## edk(effective degrees of freedom) =  tr{(I + λA)^−1}
+## To find sig2 and gcv the results remains same as in previous method. 
 
-## We calculated the coefficients, edk(effective degrees of freedom) and sig2 by
-## using the appropriate matrix multiplication formulas given in instructions. 
+## Finally, the function can be estimated by using the appropriate penalty which
+## can be seen in final plots. 
+## s.t. estimated values are given by y_est = Xβ + ε
 
 
 
@@ -52,7 +63,7 @@
 
 Basis_mat<- function (x,k,bord){
 ## This function is used for seeting up Basis matrix for x vector,
-## where the bord is the B-spline order to use.
+## where the bord is the order of B-spline to use.
   
   dk <- diff(range(x))/(k-bord)        ## knot spacing
   knots <- seq(min(x)-dk*bord,by=dk,length=k+bord+1)
@@ -96,7 +107,7 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
   
   if (length(logsp)!=1){  
   ## If the length is not equal to 1 then we have to search for optimal
-  ## lambda value.
+  ## lambda value in the grid.
     
   vals <- exp(seq(logsp[1],logsp[-1],length.out=ngrid))
                                        ## Creating a grid to search
@@ -110,18 +121,18 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
     
     beta <- solve(R)%*%U%*%solve( I + temp_lambda * A)%*%t(U)%*%t(Q)%*% y
     ## Initializing the beta with respective value of lambda stored in vals 
-    ## using the given formula
     
     temp_edk <- sum(diag(solve( I + temp_lambda * A)))
                                        ## temporary Effective Degrees of Freedom
                                        ## for that specific lambda
     
-    fitted <- X %*% beta               ## fitted values course
+    fitted <- X %*% beta               ## fitted values course for the specific
+                                       ## value in the grid
     
     sigma_2 <- (t(y-fitted) %*% (y-fitted)) / (n-temp_edk)
                                        ## Calculating the residual variance to 
                                        ## find the temporary gcv in order to 
-                                       ## minimize it
+                                       ## minimize it 
     
     temp_gcv <- sigma_2 / (n-temp_edk) ## computing temporary GCV values using  
                                        ## given formula
@@ -164,7 +175,8 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
                                              ## for that specific lambda
                                              
     
-    fitted <- X %*% beta                     ## fitted values course
+    fitted <- X %*% beta                     ## fitted values for the
+                                             ## estimated coefficients.
     
     sig2 <- as.numeric((t(y-fitted) %*% (y-fitted)) / (n-edk))
                                              ## Calculating the residual  
@@ -245,8 +257,8 @@ pspline<- function (x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100){
   }
   beta <- solve(t(X) %*% X + lambda * t(D) %*% D) %*% t(X) %*% y
                                            ## Calculating the coefficients(beta)
-                                           ## for optimal value of lambda
-                                           ## using given for
+                                           ## for optimal(best) value of lambda
+                                          
                                     
   fitted <- X %*% beta                     ## Calculating the course of fitted
                                            ## values
@@ -256,7 +268,7 @@ pspline<- function (x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100){
   m <- list(x=x, y=y, k=k, logsp=logsp, bord=bord, pord=pord, ngrid=ngrid,
        lambda=lambda, coef=beta, fitted=fitted, sig2=sig2, edk=edk, gcv=gcv, V=V
        , residuals=res)
-                                           ## Creating a list of objects to for
+                                           ## Creating a list of objects for
                                            ## class pspline 
   
   class(m)<- "pspline"                     ## Created pspline class with the 
@@ -288,16 +300,21 @@ print.pspline <- function (m){
                                       ## deviation, r^2 and gcv
   
   invisible(list(m$gcv, m$edk, r2))   ## Silently returning the GCV, edk, r^2
+                                      ## using invisible 
                                     
 }
 
 predict.pspline <- function(m,x,se=TRUE){
 ## This function should make predictions from the smooth fit, for new x values 
 ## within the range of the original data. The arguments are object of pspline
-## class(m), new x values(x), se for returning specific lists.
+## class(m), new x values(x), se is used for returning specific lists.
   
   Xp <- Basis_mat(x, m$k, m$bord)     ## Setting the Basis matrix using the 
                                       ## original settings.
+  
+  fit <- Xp %*% m$coef                ## New Fitted values using the 
+                                      ## coefficients obtained from the smooth
+                                      ## fit
   
   std_err <- rowSums(Xp * (Xp %*% m$V))^0.5
                                       ## Calculating the standard error by 
@@ -305,18 +322,16 @@ predict.pspline <- function(m,x,se=TRUE){
                                       
   
   if (se){     
-    ## If se is TRUE then return the list name fit and se(standard error).
+    ## If se is TRUE then return the list name fit with corresponding 
+    ## se(standard error).
     
-    fit <- Xp %*% m$coef              ## New Fitted values  
+    l <- list(fit=fit,se=std_err)     ## creating a named list 
     
-    se <- std_err                     ## Storing standard error in a list named
-                                      ## as mentioned in instructions.
-    
-    return(list(fit,se))              ## returning the list created
+    return(l)                         ## returning the list created
     
   }else{
     ## If se is FALSE then returning only new fitted values.
-    fit <- Xp %*% m$coef              ## Fitted values
+
     return(fit)                       ## returning only fitted values.
   }
   
@@ -387,14 +402,15 @@ y <- mcycle$accel                      ## Labels for the train values that
 
 
 model <- pspline(x, y)
-## Storing the results returned from pspline in a object named model.
+## Storing the results returned from pspline function in a object named model.
 
 print(model)                             ## print is a method of pspline class
                                          ## which is printing details about our
                                          ## fitted model.
 
 set.seed(0)     
-## Setting the seed
+## Setting the seed so that data don't randomize every time
+
 x_new <- runif(100,min(x),max(x))        ## New x values within the range of the 
                                          ## original data generated using 
                                          ## uniform distribution
