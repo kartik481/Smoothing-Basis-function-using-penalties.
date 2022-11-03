@@ -2,21 +2,65 @@
 ############## 3: Smoothing with basis expansions and penalties ################
 ################################################################################
 
-################################ Contributors ################################## 
-
+################################ Contributor ################################## 
 ##---------------------------  Kartik (s2407270)------------------------------##
+
+##------------------------------ Problem Description -------------------------##
+## In this practical, we have to write the R functions for smoothing x, y data. 
+## The model is defined using the equation:- yi =f(xi)+εi, i=1,...,n
+## where xi and yi are observed and where as f(xi) is a unknown smooth function
+## for which we have to estimate the parameters. To estimate f you approximate 
+## it using a basis expansion, f(x) = sum(βjbj(x)), j=1...,k where the bj(x) are 
+## where as k is chosen such that it can estimate wide range of function shapes. 
+## In this Problem, the B-spline basis functions are evaluated at any x value
+## within the range of data. Our main aim of these is to write the linear
+## model as y = Xβ + ε where Xij =bj(xi)
+
+## But to avoid over fitting, we are introducing a smoothing penalty. 
+## Then the model is penalized by using least square method:   
+##                        β = argmin |y−Xβ|**2 + λ*βT*DT*D*β (T means transpose) 
+## where lambda(λ) is the smoothing parameter which we need to estimate
+## by using the grid search between the specified intervals by minimizing the 
+## gcv(generalized cross validation criterion). But if only one value is given 
+## then no searching is done for it.
+
+## If we find optimal value for lambda then we can easily find our coefficients
+## Given that our smooth function estimate can vary from something very wiggly 
+## to a simple straight line fit as lambda(λ) increases, it does not make sense 
+## to treat its statistical degrees of freedom as k. Instead the effective 
+## degrees of freedom, κ = tr{(XT X+ λDT D)−1XT X} is used.
+## And from this result we can then caclculate the residual vairance given by
+##                        sig2(σˆ2) = |y − μ|^2 / (n − κ), 
+## By calculating these paramtersfor our data, we can finally find GCV which is 
+## called generalized cross validation criterion. But computing GCV directly can
+## be very costly and can take O(k^3) operations to find the value of lambda.
+## To avoid this, we are doing the QR decomposition of our basis matrix such
+## that X = QR, then after doing that we are decomposing the resultant matrix 
+## by eigen decomposition using the given formula. By doing this trick we easily
+## find our parameters using only O(k) operation for each new value of lambda.
+
+## We calculated the coefficients, edk(effective degrees of freedom) and sig2 by
+## using the appropriate matrix multiplication formulas given in instructions. 
+
+
 
 #################################### CODE  #####################################
 
-library(MASS)
-library(methods)
+
+##library(MASS)
+## Used to get the mcycle data from MASS library
 
 Basis_mat<- function (x,k,bord){
+## This function is used for seeting up Basis matrix for x vector,
+## where the bord is the B-spline order to use.
   
-  dk <- diff(range(x))/(k-bord)                ## knot spacing
+  dk <- diff(range(x))/(k-bord)        ## knot spacing
   knots <- seq(min(x)-dk*bord,by=dk,length=k+bord+1)
   X <- splines::splineDesign(knots,x,ord=bord+1,outer.ok=TRUE)
-  return(X)
+                                       ## Spline Design function from R’s built 
+                                       ## in splines package to set up matrix
+ 
+   return(X)                           ## Returning the modified matrix
 }
 
 
@@ -30,21 +74,13 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
   
   
   S <- t(solve(R)) %*% t(D) %*% D %*% solve(R)
-                                             ## Defining the eigen decomposition
-                                             ## vector to decompose to speed up  
-                                             ## search for optimal lambda
+                                       ## Defining the eigen decomposition
+                                       ## vector to decompose to speed up  
+                                       ## search for optimal lambda
   
-  ev <- eigen(S)                        ## getting Eigen values and vector
-  A <- diag(ev$values)                  ## Extract the eigen components for A
-  U <- ev$vectors                       ## Extracting the eigen vectors for U
-  
-  vals <- exp(seq(logsp[1],logsp[-1],length.out=ngrid))
-                                       ## Creating a grid to search
-                                       ## for lambda values to try. Taking 
-                                       ## exponential because all values are in
-                                       ## log scale to convert back we use exp()
-                                       ## exponential function.
-  
+  ev <- eigen(S)                       ## getting Eigen values and vector
+  A <- diag(ev$values)                 ## Extract the eigen components for A
+  U <- ev$vectors                      ## Extracting the eigen vectors for U
   
   gcv <- 1e6                           ## initializing the min_gcv value  
                                        ## to very large value in order to 
@@ -58,10 +94,23 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
   I <- diag(k)                         ## creating a Identity matrix of 
                                        ## same dimensions as k
   
+  if (length(logsp)!=1){  
+  ## If the length is not equal to 1 then we have to search for optimal
+  ## lambda value.
+    
+  vals <- exp(seq(logsp[1],logsp[-1],length.out=ngrid))
+                                       ## Creating a grid to search
+                                       ## for lambda values to try. Taking 
+                                       ## exponential because all values are in
+                                       ## log scale to convert back we use exp()
+                                       ## exponential function.
+    
   for (temp_lambda in vals){           ## iterating vals(i.e. lambda values)
     
-    ## Initializing the beta with respective value of lambda stored in vals 
+    
     beta <- solve(R)%*%U%*%solve( I + temp_lambda * A)%*%t(U)%*%t(Q)%*% y
+    ## Initializing the beta with respective value of lambda stored in vals 
+    ## using the given formula
     
     temp_edk <- sum(diag(solve( I + temp_lambda * A)))
                                        ## temporary Effective Degrees of Freedom
@@ -89,13 +138,48 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
                                              ## lambda  
       
       edk <- temp_edk                        ## Effective degrees of freedom edk 
-      opt_sigma_2 <<-sigma_2                 ## and optimal value of residual
+      
+      sig2 <<- as.numeric(sigma_2)           ## Optimal value of residual
                                              ## variance by minimizing GCV.
     }
   }
-  return(c(lambda,gcv,edk,opt_sigma_2))   ## return the optimal parameters 
-                                          ## obtained
   
+  V <- (solve(R)%*%U%*%solve( I + lambda * A)%*%t(U) %*% t(solve(R))) * sig2
+                                             ## covariance matrix for the 
+                                             ## coefficients(β)
+  
+  return(list(lambda,gcv,edk,sig2,V))        ## return the optimal parameters 
+                                             ## obtained
+                                       
+  }else{
+  
+    lambda <- exp(logsp)
+    ## If only a single value is provided then no searching is done,
+    ## we just take the exponential of given logsp value.
+      
+    beta <- solve(R)%*%U%*%solve( I + lambda * A)%*%t(U)%*%t(Q)%*% y
+    ## Calculating the beta with respective value of lambda.
+    
+    edk <- sum(diag(solve( I + lambda * A))) ## Effective Degrees of Freedom
+                                             ## for that specific lambda
+                                             
+    
+    fitted <- X %*% beta                     ## fitted values course
+    
+    sig2 <- as.numeric((t(y-fitted) %*% (y-fitted)) / (n-edk))
+                                             ## Calculating the residual  
+                                             ## variance to find the GCV
+    
+    gcv <- sig2 / (n-edk)                    ## Computing GCV value using  
+                                             ## given formula
+    
+    
+    V <- (solve(R)%*%U%*%solve( I + lambda * A)%*%t(U) %*% t(solve(R))) * sig2
+                                             ## covariance matrix for the 
+                                             ## coefficients(β)
+                  
+    return(list(lambda,gcv,edk,sig2,V))      ## return the obtained parameters.
+  }
   
 }
 
@@ -113,114 +197,211 @@ pspline<- function (x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100){
   n <- length(x)                           ## No. of input values or datapoints
   
   D <- diff(diag(k),differences=pord)      ## D is a k−2 × k matrix of zeroes
-                                           ## used to estimate beta
   
-  lambda <- 0                              ## initialing as global var.
+  lambda <- 0                              ## initialing lambda as global var.
   
-  if (length(logsp)==1){
-    lambda <- logsp[1]
+  QR <- qr(X)                              ## Doing QR decomposition of X vector
+                                           ## using inbuilt qr() function.
+  
+  Q <- qr.Q(QR)                            ## Extracting the Q matrix from QR
+  
+  R <- qr.R(QR)                            ## Extracting the R matrix from QR
+  
+  if (length(logsp)==1){                   ## if single value (log λ scale) 
+                                           ## is given.
+    
+    optimal <<- estimate(n,Q,R,D,X,y,k,logsp,ngrid)
+                                           ## getting the required components
+                                           ## in a list named optimal from the
+                                           ## estimate function.
+    
+    lambda <<- optimal[[1]]                ## Getting optimal lambda from list
+    
+    gcv <<- optimal[[2]]                   ## Getting GCV value
+    
+    edk <<- optimal[[3]]                   ## Extracting the effective degrees 
+                                           ## of freedom
+    
+    sig2 <<- optimal[[4]]                  ## Extracting the residual variance
+    
+    V <<- optimal[[5]]                     ## covariance matrix for the 
+                                           ## coefficients, β,
+    
   }else{
-    QR <- qr(X)                            ## Doing QR decomposition of X vector 
-    Q <- qr.Q(QR)                          ## Extarcting the Q matrix
-    R <- qr.R(QR)                          ## Extracting the R matrix
     
     optimal <- estimate(n,Q,R,D,X,y,k,logsp,ngrid) 
-                                           ## Calling the func estimate to
-    lambda <- optimal[1]                   ## to get optimal value of λ 
+                                           ## Calling the function estimate to
+    lambda <- optimal[[1]]                 ## to get optimal value of λ 
                                                       
-    gcv <<- optimal[2]                     ## Extracting the optimal value of 
-    edk <<- optimal[3]                     ## GCV, edk(effective degrees of 
+    gcv <<- optimal[[2]]                   ## Extracting the optimal value of 
+    edk <<- optimal[[3]]                   ## GCV, edk (effective degrees of 
                                            ## freedom)
-    sigma_2 <<- optimal[4]                 ## Residual variance                            
     
+    sig2 <<- optimal[[4]]                  ## Residual variance 
+    
+    V <<- optimal[[5]]                     ## Covariance  matrix for coefficient
+                                           ## beta
+  
   }
   beta <- solve(t(X) %*% X + lambda * t(D) %*% D) %*% t(X) %*% y
-  fit <- X %*% beta
-  return (list(lambda,beta, fit,sigma_2,edk,gcv))
+                                           ## Calculating the coefficients(beta)
+                                           ## for optimal value of lambda
+                                           ## using given for
+                                    
+  fitted <- X %*% beta                     ## Calculating the course of fitted
+                                           ## values
+  
+  res <- y - fitted                        ## Calculating the residuals values
+  
+  m <- list(x=x, y=y, k=k, logsp=logsp, bord=bord, pord=pord, ngrid=ngrid,
+       lambda=lambda, coef=beta, fitted=fitted, sig2=sig2, edk=edk, gcv=gcv, V=V
+       , residuals=res)
+                                           ## Creating a list of objects to for
+                                           ## class pspline 
+  
+  class(m)<- "pspline"                     ## Created pspline class with the 
+                                           ## attributes given in the list.
+  
+  return(m)                                ## returning the objects of pspline
+                                           ## class to caller
 }
 
-data(mcycle)                           ## Getting the mcycle dataset from 
-                                       ## mass library
-
-x_train <- mcycle$times                ## Input values that corresponds to time 
-                                       ## at an instant
-
-y_train <- mcycle$accel                ## Labels for the train values that 
-                                       ## corresponds to the acceleration at 
-                                       ## that specific time
-
-
-
-attr <- pspline(x_train,y_train,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100)
-
-a <-list(x=x_train,y=y_train,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100,lambda=attr[[1]]
-         ,beta=attr[[2]],fit=attr[[3]],sigma_2=attr[[4]],edk=attr[[5]],gcv=attr[[6]])
-
-class(a) <- "pspline"
-
-
 print.pspline <- function (m){
-  cat("Order",m$bord,"p-spline with order",m$pord,"penalty","\n")
-  cat("Effective degrees of freedom:",m$edk,"Coefficients:",length(m$beta),"\n")
+## This a method function for pspline class. The arguments are the objects of 
+## pspline class. 
   
-  r_2 <- 1-(length(m$y)-1)* sigma_2 / sum(t(m$y-mean(m$y)) %*% (m$y-mean(m$y)))
+  cat("Order", m$bord, "p-spline with order", m$pord, "penalty","\n")
+                                      ## Printing the the spline order and 
+                                      ## and penalty
   
-  cat("Residual std dev:",sqrt(m$sigma_2),"r-squared:",r_2,"GCV:",m$gcv,"\n")
+  cat("Effective degrees of freedom:",m$edk,"Coefficients:",length(m$coef),"\n")
+                                      ## Printing the Effective degrees of 
+                                      ## freedom and coefficients
   
-  return(list(gcv,m$edk,r_2))
+  
+  r2 <- 1-(length(m$y)-1)* m$sig2 / sum(t(m$y-mean(m$y)) %*% (m$y-mean(m$y)))
+                                      ## Calculating the r^2 error using the 
+                                      ## given formula
+  
+  cat("Residual std dev:",sqrt(m$sig2),"r-squared:",r2,"GCV:",m$gcv,"\n")
+                                      ## Printing the Residual standard 
+                                      ## deviation, r^2 and gcv
+  
+  invisible(list(m$gcv, m$edk, r2))   ## Silently returning the GCV, edk, r^2
+                                    
 }
 
 predict.pspline <- function(m,x,se=TRUE){
-  Xp <- Basis_mat(x,m$k,m$bord)
+## This function should make predictions from the smooth fit, for new x values 
+## within the range of the original data. The arguments are object of pspline
+## class(m), new x values(x), se for returning specific lists.
   
-  D <- diff(diag(m$k),differences=m$pord) 
+  Xp <- Basis_mat(x, m$k, m$bord)     ## Setting the Basis matrix using the 
+                                      ## original settings.
   
-  V <- solve(t(Xp) %*% Xp + m$lambda * t(D) %*%  D) * sigma_2            
+  std_err <- rowSums(Xp * (Xp %*% m$V))^0.5
+                                      ## Calculating the standard error by 
+                                      ## taking the sqrt of covariance matrix.
+                                      
   
-  std_err <- sqrt(rowSums(Xp * (Xp %*% V)))
-  if (se){
-    fit <- Xp %*% m$beta
-    se <- std_err
-    return(list(fit,se)) 
-  }else{
+  if (se){     
+    ## If se is TRUE then return the list name fit and se(standard error).
     
-    predictions <- Xp %*% m$beta 
-    return(predictions)
+    fit <- Xp %*% m$coef              ## New Fitted values  
+    
+    se <- std_err                     ## Storing standard error in a list named
+                                      ## as mentioned in instructions.
+    
+    return(list(fit,se))              ## returning the list created
+    
+  }else{
+    ## If se is FALSE then returning only new fitted values.
+    fit <- Xp %*% m$coef              ## Fitted values
+    return(fit)                       ## returning only fitted values.
   }
   
 }
 
-plot.pspline <- function(m)
-{
+plot.pspline <- function(m){
+## This function plots the three different types of plots by taking pspline
+## class object(m) as a argument. 
   layout(matrix(c(1,1,2,3),2,2,byrow=TRUE))   ## splitting the plot window in 
                                               ## areas with custom sizes using 
                                               ## layout function, where 
                                               ## matrix in function specifying 
                                               ## the location of figures.
   
-  plot(m$x,m$y,xlab="Data",ylab="Labels",col=7)
-  ## Plotting the 1st figure 
-  lines(m$x,m$fit,col="red")
-  
-  se <- predict(m,m$x)[[2]]
-  print(se)
-  upper<- m$fit + 1.96*se                                # upper 95% conf. band
-  lower <- m$fit - 1.96*se                               # lower 95% conf. band
-  
-  lines(m$x, upper, type="plp", pch="-",col=4)
-  lines(m$x, lower, type="plp", pch="-",col=4)
+  plot(m$x, m$y, main=" Smooth function fitted to the Data", 
+  xlab="x", ylab="y")          
+                                              ## Plotting the 1st figure of 
+                                              ## x and y (original data) 
+   
   
   
-  residuals <- m$y-m$fit
-  plot(m$fit,residuals,xlab="Fitted values",ylab="Residuals",col="red")
+  se <- predict(m,m$x)[[2]]                   ## Getting standard errors from
+                                              ## the previous predict.pspline
+                                              ## method which are stored at 
+                                              ## index 2 of the list.
   
-  qqnorm(residuals, pch = 1, frame= FALSE)
-  qqline(residuals, col="steelblue", lwd=2)
+  ul <- m$fitted + 1.96*se                    ## upper 95% credible interval 
+   
+  ll <- m$fitted - 1.96*se                    ## lower 95% credible interval
+  
+  lines(m$x,m$fitted,col="red")               ## Plotting estimated smooth
+                                              ## function overlaid as line
+  
+  lines(m$x, ul,type="l", lty=2, col="blue")  ## Plotting the upper 95% upper
+                                              ## credible intervals 
+                                             
+  lines(m$x, ll, type="l", lty=2, col="blue") ## Plotting the upper 95% lowe
+                                              ## credible intervals
+  
+  legend("topleft", legend=c("Fitted smooth function", "95% credible intervals")
+  , col=c("red","blue"),lty=1:2 ,cex=0.437, bty="n") 
+                                              ## Adding legend to the plot 
+                                              ## describing the plot
   
   
+  plot(m$fitted, m$residuals, main="Residuals against fitted values", 
+  xlab="Fitted values", ylab="Residuals", col="red")
+                                              ## plot the model residuals 
+                                              ## against fitted values
+  
+  qqnorm(m$residuals, pch = 1, frame= FALSE)  ## qqplot of the residuals.
+  qqline(m$residuals, col="red", lwd=1)       ## Adding line to qqplot
+  
+  invisible(list(ll,ul,m$x))                  ## returning the list silently
+                                              ## using invisible function.
 }
 
-imp <-print(a)
+data(mcycle)                           ## Getting the mcycle dataset from 
+                                       ## mass library
 
-pred <-predict(a,x_train)
-plot(a)
+x <- mcycle$times                      ## Input values that corresponds to time 
+                                       ## at an instant
+
+y <- mcycle$accel                      ## Labels for the train values that 
+                                       ## corresponds to the acceleration at 
+                                       ## that specific time
+
+
+
+model <- pspline(x, y)
+## Storing the results returned from pspline in a object named model.
+
+print(model)                             ## print is a method of pspline class
+                                         ## which is printing details about our
+                                         ## fitted model.
+
+set.seed(0)     
+## Setting the seed
+x_new <- runif(100,min(x),max(x))        ## New x values within the range of the 
+                                         ## original data generated using 
+                                         ## uniform distribution
+
+predict(model,x_new)                     ## Making predictions for newly 
+                                         ## generated x values using the predict
+                                         ## method of pspline
+
+plot(model)                              ## Calling the method plot to plot
+                                         ## three required plots
