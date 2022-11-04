@@ -63,7 +63,7 @@
 ## can be seen in final plots. 
 ## s.t. estimated values are given by y_est = Xβ + ε
 ## By using these parameters we can then find errors like R^2, residual standard
-## error 
+## error to check how good is our model.
 
 
 
@@ -171,7 +171,7 @@ estimate <- function(n,Q,R,D,X,y,k,logsp,ngrid){
   return(list(lambda,gcv,edk,sig2,V))        ## return the optimal parameters 
                                              ## obtained
                                        
-  }else{
+  }else if(length(logsp)==1){
   
     lambda <- exp(logsp)
     ## If only a single value is provided then no searching is done,
@@ -249,7 +249,8 @@ pspline<- function (x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100){
     V <<- optimal[[5]]                     ## covariance matrix for the 
                                            ## coefficients, β,
     
-  }else{
+  }else{                                   ## else if the more than 1 value of 
+                                           ## lambda(on log scale) is given.
     
     optimal <- estimate(n,Q,R,D,X,y,k,logsp,ngrid) 
                                            ## Calling the function estimate to
@@ -337,7 +338,7 @@ predict.pspline <- function(m,x,se=TRUE){
     ## If se is TRUE then return the list name fit with corresponding 
     ## se(standard error).
     
-    l <- list(fit=fit,se=std_err)     ## creating a named list 
+    l <- list(fit=fit, se=std_err)    ## creating a named list of fit & se 
     
     return(l)                         ## returning the list created
     
@@ -379,10 +380,10 @@ plot.pspline <- function(m){
                                               ## function overlaid as line
   
   lines(m$x, ul,type="l", lty=2, col="blue")  ## Plotting the upper 95% upper
-                                              ## credible intervals 
+                                              ## credible intervals for smooth 
                                              
   lines(m$x, ll, type="l", lty=2, col="blue") ## Plotting the upper 95% lowe
-                                              ## credible intervals
+                                              ## credible intervals for smooth
   
   legend(x="topleft",legend=c("Fitted smooth function", "95% credible intervals")
   , col=c("red","blue"),lty=1:2 ,cex=0.437,bty='n') 
@@ -396,18 +397,18 @@ plot.pspline <- function(m){
                                               ## against fitted values
   ## 3rd plot
   qqnorm(m$residuals, pch = 1, frame= FALSE)  ## qqplot of the residuals.
-  qqline(m$residuals, col="red", lwd=1)       ## Adding line to qqplot
+  qqline(m$residuals, col="red", lwd=2)       ## Adding line to qqplot using 
+                                              ## qqline function
   
   invisible(list(ll,ul,m$x))                  ## returning the list silently
                                               ## using invisible function.
 }
 
+
 model <- pspline(x, y)   ## Storing the results returned from pspline function 
                          ## in a object named model.
 
-print(model)                             ## print is a method of pspline class
-                                         ## which is printing details about our
-                                         ## fitted model.
+
 
 set.seed(0)              ## Setting the seed so that data don't randomize 
 
@@ -415,9 +416,12 @@ x_new <- runif(100,min(x),max(x))        ## New x values within the range of the
                                          ## original data generated using 
                                          ## uniform distribution
 
-predict(model,x_new)                     ## Making predictions for newly 
+predict(model,x_new,se=0)                     ## Making predictions for newly 
                                          ## generated x values using the predict
                                          ## method of pspline
 
 plot(model)                              ## Calling the method plot to plot
                                          ## three required plots
+
+                                         ## print is a method of pspline class
+print(model)                             ## printing details about our model.
