@@ -416,7 +416,7 @@ x_new <- runif(100,min(x),max(x))        ## New x values within the range of the
                                          ## original data generated using 
                                          ## uniform distribution
 
-predict(model,x_new,se=0)                     ## Making predictions for newly 
+predict(model,x_new)                     ## Making predictions for newly 
                                          ## generated x values using the predict
                                          ## method of pspline
 
