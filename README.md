@@ -1,2 +1,1 @@
-# Practical3
-Smoothing with basis expansions and penalties.
+# Smoothing with basis expansions and penalties.
