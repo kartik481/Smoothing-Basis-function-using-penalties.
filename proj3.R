@@ -354,11 +354,6 @@ plot.pspline <- function(m){
 ## This function plots the three different types of plots by taking pspline
 ## class object(m) as a argument. 
   
-  layout(matrix(c(1,1,2,3),2,2,byrow=TRUE))   ## splitting the plot window in 
-                                              ## areas with custom sizes using 
-                                              ## layout function, where 
-                                              ## matrix in function specifying 
-                                              ## the location of figures.
   ## 1st plot
   plot(m$x, m$y, main=" Smooth function fitted to the Data", 
   xlab="x", ylab="y")          
@@ -404,7 +399,10 @@ plot.pspline <- function(m){
                                               ## using invisible function.
 }
 
-
+library(MASS)
+data(mcycle)
+x <- mcycle$times
+y <- mcycle$accel
 model <- pspline(x, y)   ## Storing the results returned from pspline function 
                          ## in a object named model.
 
